@@ -159,14 +159,37 @@ class AdvancedDocumentExtractor:
             return []
 
     def _process_table(self, table: List[List[str]]) -> Optional[List[List[str]]]:
+        """Process a table with robust error handling."""
         if not table:
             return None
-        cleaned = []
-        for row in table:
-            cleaned_row = [ " ".join(cell.split()).strip() for cell in row ]
-            if any(cleaned_row):
-                cleaned.append(cleaned_row)
-        return cleaned if cleaned else None
+            
+        try:
+            cleaned = []
+            for row in table:
+                try:
+                    # Handle None cells and convert all values to strings
+                    cleaned_row = []
+                    for cell in row:
+                        if cell is None:
+                            cleaned_row.append("")
+                        else:
+                            # Convert to string and clean
+                            cell_str = str(cell)
+                            cleaned_row.append(" ".join(cell_str.split()).strip())
+                            
+                    # Only add rows that have content
+                    if any(cleaned_row):
+                        cleaned.append(cleaned_row)
+                        
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"Error processing table row: {str(e)}")
+                    continue
+                    
+            return cleaned if cleaned else None
+            
+        except Exception as e:
+            logger.warning(f"Error processing table: {str(e)}")
+            return None
 
     def _extract_docx(self):
         doc = Document(self.file_path)
