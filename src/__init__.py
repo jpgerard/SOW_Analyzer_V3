@@ -1,3 +1,7 @@
-"""SOW Analyzer V3 - A tool for analyzing Statement of Work documents."""
+"""SOW Analyzer V3 package."""
 
-__version__ = "0.1.0"
+import os
+import sys
+
+# Add the src directory to Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
