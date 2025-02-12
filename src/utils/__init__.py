@@ -1,17 +1,15 @@
-"""Utility modules for SOW Analyzer."""
+"""Utilities module."""
 
 from .exceptions import (
-    SOWAnalyzerError,
     DocumentProcessingError,
-    RequirementExtractionError,
-    MatcherError,
-    ConfigurationError
+    ExtractionError,
+    AnalysisError,
+    MatchingError
 )
 
 __all__ = [
-    'SOWAnalyzerError',
     'DocumentProcessingError',
-    'RequirementExtractionError',
-    'MatcherError',
-    'ConfigurationError'
+    'ExtractionError',
+    'AnalysisError',
+    'MatchingError'
 ]
