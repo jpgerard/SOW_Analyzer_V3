@@ -7,11 +7,16 @@ from pathlib import Path
 
 from src.document_processing.document_extractor import AdvancedDocumentExtractor
 from src.analysis.section_extractor import extract_toc, EnhancedSectionExtractor
-from src.extraction.requirement_extractor import RequirementExtractor
-from src.reporting.proposal_matcher import ProposalMatcher
+from src.extraction.requirement_extractor import RequirementExtractor, Requirement
+from src.reporting.proposal_matcher import HybridProposalMatcher as ProposalMatcher
 
-# Load spaCy model once for all tests
-nlp = spacy.load("en_core_web_sm")
+# Load improved spaCy model with word vectors
+try:
+    nlp = spacy.load("en_core_web_md")
+except OSError:
+    print("Downloading improved spaCy model...")
+    os.system("python -m spacy download en_core_web_md")
+    nlp = spacy.load("en_core_web_md")
 
 # Get paths to test data
 TEST_DATA_DIR = Path(__file__).parent / "data" / "sow_samples"
