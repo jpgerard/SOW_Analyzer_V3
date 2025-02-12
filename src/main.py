@@ -74,8 +74,8 @@ def main():
                 all_requirements.extend(reqs)
             
             # Count requirement types
-            mandatory_reqs = [r for r in all_requirements if r.type == "Mandatory"]
-            informative_reqs = [r for r in all_requirements if r.type == "Informative"]
+            mandatory_reqs = [r for r in all_requirements if r.req_type == "Mandatory"]
+            informative_reqs = [r for r in all_requirements if r.req_type == "Informative"]
             
             # Display requirements summary
             st.success(f"Found {len(all_requirements)} requirements!")
@@ -109,7 +109,7 @@ def main():
             for req in all_requirements:
                 df_data.append({
                     "Requirement": req.text,
-                    "Type": req.type if hasattr(req, 'type') else "Unspecified",
+                    "Type": req.req_type if hasattr(req, 'req_type') else "Unspecified",
                     "Confidence": f"{req.confidence:.2f}" if hasattr(req, 'confidence') else "N/A",
                     "Section": req.section_id if hasattr(req, 'section_id') else "N/A"
                 })
