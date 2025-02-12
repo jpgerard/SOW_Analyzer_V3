@@ -3,5 +3,7 @@
 import os
 import sys
 
-# Add the src directory to Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add the parent directory to Python path
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
