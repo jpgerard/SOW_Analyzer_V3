@@ -1,16 +1,4 @@
 """SOW Analyzer V3 package."""
 
-# Import submodules
-from . import document_processing
-from . import analysis
-from . import extraction
-from . import reporting
-from . import utils
-
-__all__ = [
-    'document_processing',
-    'analysis',
-    'extraction',
-    'reporting',
-    'utils'
-]
+# Version information
+__version__ = '3.0.0'
