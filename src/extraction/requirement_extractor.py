@@ -12,6 +12,7 @@ class Requirement:
     text: str
     req_type: str = "Unknown"
     confidence: float = 0.0
+    category: str = "Uncategorized"
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -59,7 +60,15 @@ class RequirementExtractor:
         }
 
     def extract_requirements(self, section_title: str, section_text: str) -> List[Requirement]:
-        """Extract requirements from section text."""
+        """Extract requirements from section text.
+        
+        Args:
+            section_title: Title of the section being processed
+            section_text: Text content of the section
+            
+        Returns:
+            List of extracted requirements with section information
+        """
         try:
             import spacy
             nlp = spacy.load("en_core_web_sm")
@@ -87,13 +96,17 @@ class RequirementExtractor:
             
             # Check if it's a requirement
             if analysis["is_requirement"]:
+                # Determine requirement category based on content
+                category = self._determine_category(sentence, section_title)
+                
                 # Create requirement object
                 req = Requirement(
-                    section_id=section_title,
+                    section_id=section_title,  # Will be updated by main.py with actual section ID
                     section_title=section_title,
                     text=sentence,
                     req_type=analysis["type"],
                     confidence=analysis["confidence"],
+                    category=category,
                     metadata={
                         "word_count": len(sentence.split()),
                         "has_mandatory": analysis.get("has_mandatory", False),
@@ -104,6 +117,38 @@ class RequirementExtractor:
                 requirements.append(req)
                 
         return requirements
+
+    def _determine_category(self, text: str, section_title: str) -> str:
+        """Determine requirement category based on content and section title."""
+        text_lower = text.lower()
+        title_lower = section_title.lower()
+        
+        # Category mapping based on keywords
+        categories = {
+            'technical': ['technical', 'system', 'software', 'hardware', 'network', 'database', 'security'],
+            'functional': ['functional', 'feature', 'capability', 'operation'],
+            'performance': ['performance', 'speed', 'efficiency', 'throughput', 'response time'],
+            'security': ['security', 'authentication', 'authorization', 'encryption'],
+            'compliance': ['compliance', 'regulatory', 'standard', 'policy'],
+            'interface': ['interface', 'api', 'integration', 'interoperability'],
+            'quality': ['quality', 'reliability', 'availability', 'maintainability'],
+            'documentation': ['documentation', 'document', 'report', 'manual'],
+            'testing': ['test', 'validation', 'verification', 'acceptance'],
+            'training': ['training', 'user guide', 'instruction'],
+            'support': ['support', 'maintenance', 'service level', 'helpdesk']
+        }
+        
+        # Check section title first
+        for category, keywords in categories.items():
+            if any(keyword in title_lower for keyword in keywords):
+                return category.title()
+        
+        # Then check requirement text
+        for category, keywords in categories.items():
+            if any(keyword in text_lower for keyword in keywords):
+                return category.title()
+        
+        return "Uncategorized"
 
     def _analyze_sentence(self, sentence: str) -> Dict[str, Any]:
         """Analyze a sentence to determine if it contains a requirement."""

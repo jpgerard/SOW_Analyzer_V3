@@ -1,28 +1,52 @@
-"""Section extraction module."""
+"""Section extraction module with robust hierarchical parsing."""
 
 import re
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
+
+@dataclass
+class Section:
+    """Represents a document section with hierarchical information."""
+    id: str
+    title: str
+    level: int
+    content: List[str]
+    parent_id: Optional[str] = None
+    subsections: List['Section'] = None
+    
+    def __post_init__(self):
+        if self.subsections is None:
+            self.subsections = []
+
+    def to_dict(self) -> Dict:
+        """Convert section to dictionary format."""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "level": self.level,
+            "content": "\n".join(self.content),
+            "parent_id": self.parent_id
+        }
 
 def extract_toc(text: str) -> Dict[str, str]:
-    """Extract table of contents from document text."""
+    """Extract table of contents with improved pattern matching."""
     toc = {}
-    lines = text.splitlines()[:50]  # Look deeper in the document
+    lines = text.splitlines()[:50]  # Look deeper in document
     toc_started = False
     toc_patterns = [
         r'^\d+(?:\.\d+)*\s+(.*)',  # Numbered sections
         r'^[A-Z]\.?\s+(.*)',       # Lettered sections
         r'^(?:Section|SECTION)\s+\d+:?\s*(.*)',  # "Section X" format
-        r'^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.?\s+(.*)'  # Roman numerals
+        r'^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.?\s+(.*)',  # Roman numerals
+        r'^(?:ARTICLE|Article)\s+\d+:?\s*(.*)' # Article format
     ]
     
     for i, line in enumerate(lines):
-        # Look for TOC indicators
         if re.search(r'(?:Table\s+of\s+Contents|Contents|TABLE\s+OF\s+CONTENTS)', line, re.IGNORECASE):
             toc_started = True
             continue
             
         if toc_started:
-            # Try all patterns
             for pattern in toc_patterns:
                 m = re.match(pattern, line.strip())
                 if m:
@@ -31,9 +55,8 @@ def extract_toc(text: str) -> Dict[str, str]:
                         toc[header] = line.strip()
                     break
             
-            # Check if we've reached the end of TOC
-            if toc and not any(p for p in toc_patterns if re.match(p, line.strip())):
-                # Look ahead a few lines to confirm TOC end
+            # Check for TOC end
+            if toc and not any(re.match(p, line.strip()) for p in toc_patterns):
                 next_lines = lines[i:i+3]
                 if not any(any(re.match(p, nl.strip()) for p in toc_patterns) for nl in next_lines):
                     break
@@ -41,12 +64,38 @@ def extract_toc(text: str) -> Dict[str, str]:
     return toc
 
 class EnhancedSectionExtractor:
-    """
-    Splits document text into sections using multiple regex patterns.
-    Incorporates TOC hints to refine section titles.
-    """
+    """Enhanced section extractor with hierarchical parsing."""
+    
     def __init__(self):
-        # Common section names in SOW documents
+        # Section ID normalization patterns
+        self.id_normalization_patterns = [
+            (r'Section\s+(\d+)', r'\1'),
+            (r'SECTION\s+(\d+)', r'\1'),
+            (r'Article\s+(\d+)', r'\1'),
+            (r'\((\d+)\)', r'\1'),
+            (r'\(([A-Z])\)', r'\1'),
+            (r'-', '.')
+        ]
+        
+        # Section header patterns with capture groups
+        self.section_patterns = [
+            # Numbered sections with optional subsections
+            (r'^\s*(?P<id>\d+(?:\.\d+)*)\s+(?P<title>[^.]+?)(?:\s*\.+\s*\d*\s*$|$)', 1),
+            
+            # Section/Article keyword format
+            (r'^\s*(?:Section|SECTION|Article|ARTICLE)\s*(?P<id>\d+(?:\.\d+)*)\s*[-.:)]\s*(?P<title>.+?)(?:\s*\.+\s*\d*\s*$|$)', 1),
+            
+            # Lettered sections with optional numbers
+            (r'^\s*(?P<id>[A-Z](?:\.\d+)*)\s+(?P<title>[^.]+?)(?:\s*\.+\s*\d*\s*$|$)', 1),
+            
+            # Roman numeral sections
+            (r'^\s*(?P<id>(?:I|II|III|IV|V|VI|VII|VIII|IX|X)(?:\.\d+)*)\s+(?P<title>.+?)(?:\s*\.+\s*\d*\s*$|$)', 1),
+            
+            # Parenthesized sections
+            (r'^\s*\((?P<id>[A-Z0-9](?:\.\d+)*)\)\s+(?P<title>[^.]+?)(?:\s*\.+\s*\d*\s*$|$)', 1)
+        ]
+        
+        # Common section names for normalization
         self.common_sections = {
             'overview': 'Overview',
             'scope': 'Scope of Work',
@@ -67,78 +116,137 @@ class EnhancedSectionExtractor:
             'technical': 'Technical Requirements',
             'functional': 'Functional Requirements'
         }
+
+    def normalize_section_id(self, section_id: str) -> str:
+        """Normalize section ID to standard format."""
+        normalized = section_id
+        for pattern, replacement in self.id_normalization_patterns:
+            normalized = re.sub(pattern, replacement, normalized)
+        return normalized.strip()
+
+    def get_section_level(self, section_id: str) -> int:
+        """Determine section level from ID."""
+        clean_id = self.normalize_section_id(section_id)
+        parts = re.split(r'[.-]', clean_id)
         
-        # Enhanced patterns for headers
-        self.patterns = [
-            re.compile(r'^\d+(?:\.\d+)*\s+(.+)'),  # Numbered sections
-            re.compile(r'^[A-Z]\.?\s+(.+)'),       # Lettered sections
-            re.compile(r'^(?:Section|SECTION)\s+\d+:?\s*(.+)'),  # "Section X" format
-            re.compile(r'^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)\.?\s+(.+)'),  # Roman numerals
-            re.compile(r'^([A-Z][A-Z\s]+(?:\s+[A-Z][a-z]+)*):'),  # ALL CAPS or Title Case with colon
-            re.compile(r'^([A-Z][a-z]+(?:\s+(?:of|and|or|the|for|to|in|on|by|with)\s+)?[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*$'),  # Title Case with common prepositions
-            re.compile(r'^(?:ARTICLE|Article)\s+\d+:?\s*(.+)')  # Article format
-        ]
+        if len(parts) > 1:
+            return len(parts)
         
+        # Single letter or number
+        if len(clean_id) == 1:
+            return 1
+        
+        # Count parts separated by any delimiter
+        parts = re.findall(r'[A-Z]|\d+', clean_id)
+        return len(parts)
+
+    def extract_section_info(self, line: str) -> Optional[Tuple[str, str, int]]:
+        """Extract section ID, title, and level from a line."""
+        line = line.strip()
+        if not line:
+            return None
+            
+        for pattern, base_level in self.section_patterns:
+            match = re.match(pattern, line)
+            if match:
+                section_id = match.group('id')
+                title = match.group('title').strip()
+                
+                # Skip if title looks like a page number
+                if re.match(r'^\d+$', title):
+                    continue
+                    
+                # Clean up title
+                title = re.sub(r'\s*-\s*', '-', title)
+                title = re.sub(r'\s+', ' ', title)
+                title = re.sub(r'\s*\.{2,}\s*\d*\s*$', '', title)
+                
+                # Check for common section names
+                title_lower = title.lower()
+                for key, common_name in self.common_sections.items():
+                    if key in title_lower:
+                        title = common_name
+                        break
+                
+                # Calculate level
+                level = self.get_section_level(section_id)
+                if level == 1:
+                    level = base_level
+                
+                return section_id, title, level
+                
+        return None
+
     def extract_sections(self, text: str, toc_hints: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Extract sections from document text using regex patterns, TOC hints, and common section names."""
-        sections = {}
+        """Extract sections with hierarchical structure."""
         lines = text.splitlines()
+        sections = []
         current_section = None
-        current_text = []
+        section_stack = []
+        content_buffer = []
         
         for line in lines:
-            stripped = line.strip()
-            if not stripped:
+            line = line.rstrip()
+            if not line:
                 continue
-            # Try to match section headers
-            header_found = False
             
-            # First try TOC hints if available
-            if toc_hints:
-                for toc_header in toc_hints:
-                    if stripped.lower().startswith(toc_header.lower()):
-                        if current_section and current_text:
-                            sections[current_section] = "\n".join(current_text)
-                        current_section = toc_header
-                        current_text = []
-                        header_found = True
-                        break
+            # Try to extract section info
+            section_info = self.extract_section_info(line)
             
-            # Then try regex patterns
-            if not header_found:
-                for pattern in self.patterns:
-                    m = pattern.match(stripped)
-                    if m:
-                        header_candidate = m.group(1).strip()
-                        # Check if it matches a common section name
-                        header_lower = header_candidate.lower()
-                        for common_key, common_name in self.common_sections.items():
-                            if common_key in header_lower:
-                                header_candidate = common_name
-                                break
-                        
-                        if current_section and current_text:
-                            sections[current_section] = "\n".join(current_text)
-                        current_section = header_candidate
-                        current_text = []
-                        header_found = True
-                        break
-            
-            # Add line to current section
-            if not header_found:
-                if current_section:
-                    current_text.append(stripped)
+            if section_info:
+                # Process buffered content
+                if current_section and content_buffer:
+                    current_section.content.extend(content_buffer)
+                    content_buffer = []
+                
+                # Create new section
+                section_id, title, level = section_info
+                section_id = self.normalize_section_id(section_id)
+                
+                # Update section stack based on level
+                while section_stack and section_stack[-1].level >= level:
+                    section_stack.pop()
+                
+                # Create section with parent info
+                parent = section_stack[-1] if section_stack else None
+                new_section = Section(
+                    id=section_id,
+                    title=title,
+                    level=level,
+                    content=[],
+                    parent_id=parent.id if parent else None
+                )
+                
+                # Add to hierarchy
+                if parent:
+                    parent.subsections.append(new_section)
                 else:
-                    # Try to identify the first section based on content
-                    lower_stripped = stripped.lower()
-                    if any(term in lower_stripped for term in ['purpose', 'overview', 'introduction']):
-                        current_section = "Introduction and Purpose"
-                    else:
-                        current_section = "Document Overview"
-                    current_text.append(stripped)
+                    sections.append(new_section)
+                
+                current_section = new_section
+                section_stack.append(current_section)
+                
+            else:
+                content_buffer.append(line)
         
-        if current_section and current_text:
-            sections[current_section] = "\n".join(current_text)
-        if not sections:
-            sections["main"] = text
-        return sections
+        # Process remaining content
+        if current_section and content_buffer:
+            current_section.content.extend(content_buffer)
+        
+        # Convert to dictionary format for compatibility
+        section_dict = {}
+        for section in sections:
+            section_dict[section.title] = self._get_section_content(section)
+            for subsection in section.subsections:
+                section_dict[subsection.title] = self._get_section_content(subsection)
+        
+        return section_dict
+
+    def _get_section_content(self, section: Section) -> str:
+        """Get section content including subsections."""
+        content = "\n".join(section.content)
+        for subsection in section.subsections:
+            subcontent = self._get_section_content(subsection)
+            if subcontent:
+                content += f"\n{subcontent}"
+        return content

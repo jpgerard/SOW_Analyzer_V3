@@ -9,7 +9,7 @@ import streamlit as st
 from anthropic import Client as AnthropicClient
 
 from src.document_processing.document_extractor import AdvancedDocumentExtractor
-from src.analysis.section_extractor import extract_toc, EnhancedSectionExtractor
+from src.analysis.section_extractor import extract_toc, EnhancedSectionExtractor, Section
 from src.extraction.requirement_extractor import RequirementExtractor
 from src.reporting.proposal_matcher import ProposalMatcher
 
@@ -64,14 +64,32 @@ def main():
             # Extract TOC and sections silently
             toc = extract_toc(sow_text)
             section_extractor = EnhancedSectionExtractor()
+            # Extract sections with hierarchical structure
             sections = section_extractor.extract_sections(sow_text, toc_hints=toc)
             
             # Extract requirements
             req_extractor = RequirementExtractor()
             all_requirements = []
-            for sec_title, sec_text in sections.items():
-                reqs = req_extractor.extract_requirements(sec_title, sec_text)
+            
+            def process_section(section: Section):
+                # Extract requirements from this section
+                reqs = req_extractor.extract_requirements(
+                    section.title,  # Pass both title and ID
+                    "\n".join(section.content)
+                )
+                # Update each requirement with section info
+                for req in reqs:
+                    req.section_id = section.id
+                    req.section_title = section.title
                 all_requirements.extend(reqs)
+                
+                # Process subsections
+                for subsection in section.subsections:
+                    process_section(subsection)
+            
+            # Process all sections
+            for section in sections:
+                process_section(section)
             
             # Count requirement types
             mandatory_reqs = [r for r in all_requirements if r.req_type == "Mandatory"]
@@ -111,7 +129,7 @@ def main():
                     "Requirement": req.text,
                     "Type": req.req_type if hasattr(req, 'req_type') else "Unspecified",
                     "Confidence": f"{req.confidence:.2f}" if hasattr(req, 'confidence') else "N/A",
-                    "Section": req.section_id if hasattr(req, 'section_id') else "N/A"
+                    "Section": f"{req.section_title} ({req.section_id})" if hasattr(req, 'section_id') else "N/A"
                 })
             
             st.dataframe(
