@@ -10,10 +10,10 @@ from typing import Optional, Tuple
 import streamlit as st
 import spacy
 
-from document_processing import AdvancedDocumentExtractor
-from analysis import extract_toc, EnhancedSectionExtractor
-from extraction import RequirementExtractor
-from reporting import HybridProposalMatcher
+from sow_analyzer.document_processing import AdvancedDocumentExtractor
+from sow_analyzer.analysis import extract_toc, EnhancedSectionExtractor
+from sow_analyzer.extraction import RequirementExtractor
+from sow_analyzer.reporting import HybridProposalMatcher
 
 # Configure logging
 logging.basicConfig(
@@ -124,7 +124,7 @@ def main():
                 st.text_area("Proposal Preview", proposal_text[:2000] + ("..." if len(proposal_text) > 2000 else ""), height=300)
                 
                 # Initialize hybrid matcher with API key from secrets
-                api_key = st.secrets.get("ANTHROPIC_API_KEY")
+                api_key = st.secrets["general"]["ANTHROPIC_API_KEY"]
                 if not api_key:
                     st.warning("No Anthropic API key found in secrets. LLM-based refinement will be disabled.")
                 
