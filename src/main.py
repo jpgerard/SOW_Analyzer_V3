@@ -10,10 +10,10 @@ from typing import Optional, Tuple
 import streamlit as st
 import spacy
 
-from .document_processing import AdvancedDocumentExtractor
-from .analysis import extract_toc, EnhancedSectionExtractor
-from .extraction import RequirementExtractor
-from .reporting import HybridProposalMatcher
+from src.document_processing import AdvancedDocumentExtractor
+from src.analysis import extract_toc, EnhancedSectionExtractor
+from src.extraction import RequirementExtractor
+from src.reporting import HybridProposalMatcher
 
 # Configure logging
 logging.basicConfig(
