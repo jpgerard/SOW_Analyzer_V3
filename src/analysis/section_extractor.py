@@ -1,8 +1,13 @@
 """Section extraction module with robust hierarchical parsing."""
 
 import re
+import logging
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Section:
@@ -177,9 +182,26 @@ class EnhancedSectionExtractor:
                 
         return None
 
-    def extract_sections(self, text: str, toc_hints: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Extract sections with hierarchical structure."""
+    def extract_sections(self, text: str, toc_hints: Optional[Dict[str, str]] = None) -> List[Section]:
+        """Extract sections with hierarchical structure.
+        
+        Args:
+            text: The document text to process
+            toc_hints: Optional table of contents hints
+            
+        Returns:
+            List of Section objects with hierarchical structure
+        
+        Raises:
+            Exception: If there's an error during section extraction
+        """
+        logger.info("Starting section extraction")
+        if not text:
+            logger.warning("Empty text provided for section extraction")
+            return []
+            
         lines = text.splitlines()
+        logger.info(f"Processing {len(lines)} lines of text")
         sections = []
         current_section = None
         section_stack = []
@@ -194,6 +216,7 @@ class EnhancedSectionExtractor:
             section_info = self.extract_section_info(line)
             
             if section_info:
+                logger.debug(f"Found section: {section_info[0]} - {section_info[1]} (Level {section_info[2]})")
                 # Process buffered content
                 if current_section and content_buffer:
                     current_section.content.extend(content_buffer)
@@ -207,15 +230,20 @@ class EnhancedSectionExtractor:
                 while section_stack and section_stack[-1].level >= level:
                     section_stack.pop()
                 
-                # Create section with parent info
-                parent = section_stack[-1] if section_stack else None
-                new_section = Section(
-                    id=section_id,
-                    title=title,
-                    level=level,
-                    content=[],
-                    parent_id=parent.id if parent else None
-                )
+                try:
+                    # Create section with parent info and default content
+                    parent = section_stack[-1] if section_stack else None
+                    new_section = Section(
+                        id=section_id,
+                        title=title,
+                        level=level,
+                        content=[""],  # Initialize with empty string instead of empty list
+                        parent_id=parent.id if parent else None
+                    )
+                    logger.debug(f"Created section object: {new_section.id} (Parent: {new_section.parent_id})")
+                except Exception as e:
+                    logger.error(f"Error creating section object: {str(e)}")
+                    continue
                 
                 # Add to hierarchy
                 if parent:
@@ -231,22 +259,28 @@ class EnhancedSectionExtractor:
         
         # Process remaining content
         if current_section and content_buffer:
-            current_section.content.extend(content_buffer)
+            current_section.content = [line for line in content_buffer if line.strip()]
+            if not current_section.content:  # Ensure at least empty string if no content
+                current_section.content = [""]
         
-        # Convert to dictionary format for compatibility
-        section_dict = {}
-        for section in sections:
-            section_dict[section.title] = self._get_section_content(section)
-            for subsection in section.subsections:
-                section_dict[subsection.title] = self._get_section_content(subsection)
-        
-        return section_dict
+        logger.info(f"Section extraction complete. Found {len(sections)} top-level sections")
+        return sections
 
     def _get_section_content(self, section: Section) -> str:
         """Get section content including subsections."""
-        content = "\n".join(section.content)
-        for subsection in section.subsections:
-            subcontent = self._get_section_content(subsection)
-            if subcontent:
-                content += f"\n{subcontent}"
-        return content
+        try:
+            # Join non-empty content lines
+            content = "\n".join(line for line in section.content if line.strip())
+            if not content:
+                content = ""  # Default to empty string if no content
+                
+            # Process subsections
+            for subsection in section.subsections:
+                subcontent = self._get_section_content(subsection)
+                if subcontent:
+                    content += f"\n{subcontent}"
+                    
+            return content
+        except Exception as e:
+            logger.error(f"Error getting section content: {str(e)}")
+            return ""  # Return empty string on error
