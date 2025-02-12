@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # SOW Analyzer V3
 
 A powerful tool for analyzing Statement of Work (SOW) documents to extract requirements and validate proposal coverage.
@@ -71,3 +72,6 @@ SOW_Analyzer_V3/
 - Multi-column detection requires proper spacing
 - LLM features require an Anthropic API key
 - Large documents may require significant memory
+=======
+# SOW_Analyzer_V3
+>>>>>>> 8eb619219ba74170ed77777a180b85ca579ab409
