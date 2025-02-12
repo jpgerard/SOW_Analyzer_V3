@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import spacy
 from spacy.tokens import Doc
+from anthropic import Client as AnthropicClient
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,14 +49,16 @@ class ProposalMatcher:
     """
     Matches requirements to proposal sections using spaCy's similarity features.
     """
-    def __init__(self, nlp: spacy.language.Language):
+    def __init__(self, nlp: spacy.language.Language, api_key: Optional[str] = None):
         self.nlp = nlp
+        self.anthropic = AnthropicClient(api_key=api_key) if api_key else None
         self.technical_terms = {
             'api', 'database', 'security', 'network', 'cloud', 'infrastructure',
             'monitoring', 'backup', 'recovery', 'compliance', 'authentication'
         }
 
     def match_requirement(self, requirement: Any, proposal_text: str) -> Dict[str, Any]:
+        """Match a requirement to sections in the proposal text using both spaCy and Claude."""
         """Match a requirement to sections in the proposal text."""
         try:
             # Process texts with spaCy
@@ -84,12 +87,22 @@ class ProposalMatcher:
             # Generate analysis
             analysis = self._generate_analysis(requirement.text, matches)
             
-            return {
+            result = {
                 "matched": bool(matches),
                 "match_confidence": max([m["score"] for m in matches]) if matches else 0.0,
                 "matched_section": matches,
                 "analysis": analysis
             }
+
+            # If Claude API is available, enhance analysis with LLM insights
+            if self.anthropic and matches:
+                try:
+                    llm_analysis = self._get_llm_analysis(requirement.text, matches[0]["text"])
+                    result["llm_analysis"] = llm_analysis
+                except Exception as e:
+                    logger.error(f"Error getting LLM analysis: {str(e)}")
+                    
+            return result
             
         except Exception as e:
             logger.error(f"Error matching requirement: {str(e)}")
@@ -138,3 +151,53 @@ class ProposalMatcher:
             analysis.append(f"\nAdditional {len(matches)-1} relevant sections found.")
         
         return "\n".join(analysis)
+
+    def _get_llm_analysis(self, requirement_text: str, matched_section: str) -> Dict[str, Any]:
+        """Get enhanced analysis from Claude."""
+        if not self.anthropic:
+            return {}
+
+        prompt = f"""Analyze how well this proposal section addresses the requirement. Be specific and thorough.
+
+Requirement:
+{requirement_text}
+
+Proposal Section:
+{matched_section}
+
+Analyze:
+1. Is the requirement fully addressed? (Yes/No/Partially)
+2. How specifically is it addressed?
+3. Rate compliance level (Full/Partial/Minimal)
+4. Rate confidence (High/Medium/Low)
+5. Suggest improvements if any
+"""
+        try:
+            response = self.anthropic.messages.create(
+                model="claude-3-opus-20240229",
+                max_tokens=1000,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            analysis = response.content[0].text
+            
+            # Parse the response into structured data
+            lines = analysis.split('\n')
+            is_addressed = "yes" in lines[0].lower()
+            how_addressed = next((line for line in lines if line.startswith("2.")), "").replace("2.", "").strip()
+            compliance = next((line for line in lines if line.startswith("3.")), "").replace("3.", "").strip()
+            confidence = next((line for line in lines if line.startswith("4.")), "").replace("4.", "").strip()
+            improvements = [s.strip() for s in next((line for line in lines if line.startswith("5.")), "").replace("5.", "").split(',') if s.strip()]
+            
+            return {
+                "is_addressed": is_addressed,
+                "how_addressed": how_addressed,
+                "compliance_level": compliance,
+                "confidence_rating": confidence,
+                "improvement_suggestions": improvements
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting LLM analysis: {str(e)}")
+            return {}

@@ -11,7 +11,7 @@ from anthropic import Client as AnthropicClient
 from src.document_processing.document_extractor import AdvancedDocumentExtractor
 from src.analysis.section_extractor import extract_toc, EnhancedSectionExtractor
 from src.extraction.requirement_extractor import RequirementExtractor
-from src.reporting.proposal_matcher import HybridProposalMatcher
+from src.reporting.proposal_matcher import ProposalMatcher
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -94,11 +94,11 @@ def main():
                 
                 # Match requirements to proposal
                 api_key = st.secrets["general"].get("ANTHROPIC_API_KEY")
-                hybrid_matcher = HybridProposalMatcher(nlp, api_key)
+                matcher = ProposalMatcher(nlp, api_key)
                 match_results = []
                 
                 for req in all_requirements:
-                    result = hybrid_matcher.match_requirement(req, proposal_text)
+                    result = matcher.match_requirement(req, proposal_text)
                     match_results.append(result)
                 
                 st.subheader("Matching Results")
