@@ -10,11 +10,6 @@ from typing import Optional, Tuple
 import streamlit as st
 import spacy
 
-from sow_analyzer.document_processing import AdvancedDocumentExtractor
-from sow_analyzer.analysis import extract_toc, EnhancedSectionExtractor
-from sow_analyzer.extraction import RequirementExtractor
-from sow_analyzer.reporting import HybridProposalMatcher
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -54,6 +49,12 @@ def cleanup_temp_file(file_path: Optional[Path]):
 
 def main():
     """Main application entry point."""
+    # Import here to avoid circular imports
+    from sow_analyzer.document_processing import AdvancedDocumentExtractor
+    from sow_analyzer.analysis import extract_toc, EnhancedSectionExtractor
+    from sow_analyzer.extraction import RequirementExtractor
+    from sow_analyzer.reporting import HybridProposalMatcher
+
     st.set_page_config(page_title="State-of-the-Art SOW Analyzer", layout="wide")
     st.title("State-of-the-Art SOW Analyzer")
     st.write("Upload a SOW document to extract requirements and sections, and optionally upload a proposal document for matching.")
