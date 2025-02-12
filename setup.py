@@ -1,9 +1,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="sow_analyzer",
+    name="sow-analyzer",
     version="0.1.0",
-    packages=find_packages(include=["sow_analyzer", "sow_analyzer.*"]),
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     include_package_data=True,
     install_requires=[
         "pdfplumber>=0.10.0",
