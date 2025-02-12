@@ -78,42 +78,66 @@ class AdvancedDocumentExtractor:
         self.processing_stats["processing_time"] = time.time() - start_time
 
     def _process_pdf_page(self, page) -> List[str]:
+        """Process a PDF page with robust error handling."""
+        if page is None:
+            logger.warning("Received None page object")
+            return []
+            
         try:
             # First try to extract text directly
             text = page.extract_text()
             if text:
-                return text.splitlines()
+                return [line for line in text.splitlines() if line.strip()]
             
             # If no text, try word extraction
             words = page.extract_words()
             if not words:
+                logger.debug("No words found on page")
                 return []
                 
             # Group words into lines
-            words.sort(key=lambda w: float(w["top"]))
+            try:
+                words.sort(key=lambda w: float(w.get("top", 0)))
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error sorting words: {str(e)}")
+                return []
+                
             lines = []
             current_top = None
             current_line = []
             
             for word in words:
+                if not isinstance(word, dict) or "text" not in word:
+                    logger.warning("Invalid word object")
+                    continue
+                    
                 try:
-                    word_top = float(word["top"])
+                    word_top = float(word.get("top", 0))
+                    word_text = str(word.get("text", "")).strip()
+                    
+                    if not word_text:
+                        continue
+                        
                     if current_top is None or abs(word_top - current_top) < 3:
-                        current_line.append(word["text"])
+                        current_line.append(word_text)
                         current_top = word_top
                     else:
                         if current_line:
-                            lines.append(" ".join(current_line))
-                        current_line = [word["text"]]
+                            line_text = " ".join(current_line).strip()
+                            if line_text:
+                                lines.append(line_text)
+                        current_line = [word_text]
                         current_top = word_top
-                except (KeyError, ValueError) as e:
+                except (KeyError, ValueError, TypeError) as e:
                     logger.warning(f"Error processing word: {str(e)}")
                     continue
                     
             if current_line:
-                lines.append(" ".join(current_line))
+                line_text = " ".join(current_line).strip()
+                if line_text:
+                    lines.append(line_text)
             
-            return lines if lines else []
+            return [line for line in lines if line.strip()]
             
         except Exception as e:
             logger.warning(f"Error processing page: {str(e)}")

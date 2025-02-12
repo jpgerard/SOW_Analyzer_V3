@@ -34,6 +34,13 @@ def save_uploaded_file(uploaded_file: st.runtime.uploaded_file_manager.UploadedF
         f.write(uploaded_file.getvalue())
     return file_path
 
+def display_section_structure(sections: list[Section], indent: str = "") -> None:
+    """Display hierarchical section structure."""
+    for section in sections:
+        st.markdown(f"{indent}**{section.id}** - {section.title}")
+        if section.subsections:
+            display_section_structure(section.subsections, indent + "  ")
+
 def main():
     """Main Streamlit application."""
     st.set_page_config(page_title="State-of-the-Art SOW Analyzer", layout="wide")
@@ -61,11 +68,14 @@ def main():
             )
             sow_text, tables, doc_stats = extractor.extract()
             
-            # Extract TOC and sections silently
+            # Extract TOC and sections
             toc = extract_toc(sow_text)
             section_extractor = EnhancedSectionExtractor()
-            # Extract sections with hierarchical structure
             sections = section_extractor.extract_sections(sow_text, toc_hints=toc)
+            
+            # Display section structure
+            st.subheader("Document Structure")
+            display_section_structure(sections)
             
             # Extract requirements
             req_extractor = RequirementExtractor()
@@ -101,14 +111,11 @@ def main():
             # Requirements counts
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.subheader("Total Requirements")
-                st.header(str(len(all_requirements)))
+                st.metric("Total Requirements", len(all_requirements))
             with col2:
-                st.subheader("Mandatory Requirements")
-                st.header(str(len(mandatory_reqs)))
+                st.metric("Mandatory Requirements", len(mandatory_reqs))
             with col3:
-                st.subheader("Informative Requirements")
-                st.header(str(len(informative_reqs)))
+                st.metric("Informative Requirements", len(informative_reqs))
             
             # Requirements by Category
             st.subheader("Requirements by Category")
@@ -117,28 +124,33 @@ def main():
                 cat = req.category if hasattr(req, 'category') and req.category else "Uncategorized"
                 categories[cat] = categories.get(cat, 0) + 1
             
-            for cat, count in categories.items():
-                st.write(f"{cat}")
-                st.header(str(count))
+            cat_cols = st.columns(len(categories))
+            for col, (cat, count) in zip(cat_cols, categories.items()):
+                with col:
+                    st.metric(cat, count)
             
             # Requirements Analysis Table
             st.subheader("Requirements Analysis")
             df_data = []
             for req in all_requirements:
                 df_data.append({
+                    "Section ID": req.section_id,
+                    "Section": req.section_title,
                     "Requirement": req.text,
                     "Type": req.req_type if hasattr(req, 'req_type') else "Unspecified",
                     "Confidence": f"{req.confidence:.2f}" if hasattr(req, 'confidence') else "N/A",
-                    "Section": f"{req.section_title} ({req.section_id})" if hasattr(req, 'section_id') else "N/A"
+                    "Category": req.category if hasattr(req, 'category') else "Uncategorized"
                 })
             
             st.dataframe(
                 df_data,
                 column_config={
+                    "Section ID": st.column_config.TextColumn("Section ID", width="small"),
+                    "Section": st.column_config.TextColumn("Section", width="medium"),
                     "Requirement": st.column_config.TextColumn("Requirement", width="large"),
                     "Type": st.column_config.TextColumn("Type", width="small"),
                     "Confidence": st.column_config.NumberColumn("Confidence", format="%.2f"),
-                    "Section": st.column_config.TextColumn("Section", width="small")
+                    "Category": st.column_config.TextColumn("Category", width="medium")
                 },
                 hide_index=True
             )
@@ -183,6 +195,7 @@ def main():
                 match_data = []
                 for req, result in zip(all_requirements, match_results):
                     match_data.append({
+                        "Section": f"{req.section_id} - {req.section_title}",
                         "Requirement": req.text,
                         "Match Found": "✓" if result.get("matched", False) else "✗",
                         "Confidence": f"{result.get('match_confidence', 0):.2f}",
@@ -193,6 +206,7 @@ def main():
                 st.dataframe(
                     match_data,
                     column_config={
+                        "Section": st.column_config.TextColumn("Section", width="medium"),
                         "Requirement": st.column_config.TextColumn("Requirement", width="large"),
                         "Match Found": st.column_config.TextColumn("Match", width="small"),
                         "Confidence": st.column_config.NumberColumn("Confidence", format="%.2f"),
