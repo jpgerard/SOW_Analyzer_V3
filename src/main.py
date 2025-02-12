@@ -2,14 +2,14 @@
 
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import spacy
 import streamlit as st
 from anthropic import Client as AnthropicClient
 
 from src.document_processing.document_extractor import AdvancedDocumentExtractor
-from src.analysis.section_extractor import extract_toc, EnhancedSectionExtractor, Section
+from src.analysis.section_parser import Section, SectionParser
 from src.extraction.requirement_extractor import RequirementExtractor
 from src.reporting.proposal_matcher import ProposalMatcher
 
@@ -68,14 +68,24 @@ def main():
             )
             sow_text, tables, doc_stats = extractor.extract()
             
-            # Extract TOC and sections
-            toc = extract_toc(sow_text)
-            section_extractor = EnhancedSectionExtractor()
-            sections = section_extractor.extract_sections(sow_text, toc_hints=toc)
+            # Initialize section parser
+            section_parser = SectionParser()
+            
+            # Parse sections with hierarchical structure
+            logger.info("Parsing document sections...")
+            sections = section_parser.parse_sections(sow_text)
+            logger.info(f"Found {len(sections)} top-level sections")
             
             # Display section structure
             st.subheader("Document Structure")
             display_section_structure(sections)
+            
+            # Validate section structure
+            issues = section_parser.validate_section_structure(sections)
+            if issues:
+                st.warning("Section Structure Issues:")
+                for issue in issues:
+                    st.write(f"- {issue}")
             
             # Extract requirements
             req_extractor = RequirementExtractor()

@@ -1,5 +1,5 @@
 """Analysis module."""
 
-from .section_extractor import extract_toc, EnhancedSectionExtractor
+from .section_parser import Section, SectionParser
 
-__all__ = ['extract_toc', 'EnhancedSectionExtractor']
+__all__ = ['Section', 'SectionParser']
