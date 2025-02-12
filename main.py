@@ -17,12 +17,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load spaCy model
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    logger.error("Spacy model 'en_core_web_sm' not found. Please install it using: python -m spacy download en_core_web_sm")
-    raise
+# Initialize spaCy
+@st.cache_resource
+def load_spacy_model():
+    """Load spaCy model with caching."""
+    try:
+        return spacy.load("en_core_web_sm")
+    except OSError as e:
+        st.error("""
+        Failed to load spaCy model. This is likely because:
+        1. The model is still being downloaded and installed
+        2. There was an issue during model installation
+        
+        Please wait a moment and refresh the page. If the issue persists,
+        contact the administrator.
+        """)
+        logger.error(f"spaCy model load error: {str(e)}")
+        raise
 
 def process_uploaded_file(uploaded_file) -> Tuple[str, Path]:
     """
@@ -58,6 +69,12 @@ def main():
     st.set_page_config(page_title="State-of-the-Art SOW Analyzer", layout="wide")
     st.title("State-of-the-Art SOW Analyzer")
     st.write("Upload a SOW document to extract requirements and sections, and optionally upload a proposal document for matching.")
+    
+    # Load spaCy model
+    try:
+        nlp = load_spacy_model()
+    except Exception:
+        st.stop()  # Stop execution if model loading fails
     
     # Clarifying questions
     col1, col2 = st.columns(2)
