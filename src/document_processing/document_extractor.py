@@ -60,20 +60,35 @@ class AdvancedDocumentExtractor:
         start_time = time.time()
         with pdfplumber.open(self.file_path) as pdf:
             for page_number, page in enumerate(pdf.pages, start=1):
+                if page is None:
+                    logger.warning(f"Skipping page {page_number}: Page is None")
+                    continue
+                    
                 try:
+                    # Extract text content
                     page_lines = self._process_pdf_page(page)
                     if page_lines:
                         self.text_lines.append(f"--- Page {page_number} ---")
                         self.text_lines.extend(page_lines)
-                    # Extract tables
-                    for table in page.extract_tables():
-                        processed = self._process_table(table)
-                        if processed:
-                            self.tables.append(processed)
-                            self.processing_stats["tables_extracted"] += 1
+                        
+                    # Extract tables if page has any
+                    try:
+                        tables = page.extract_tables()
+                        if tables:
+                            for table in tables:
+                                processed = self._process_table(table)
+                                if processed:
+                                    self.tables.append(processed)
+                                    self.processing_stats["tables_extracted"] += 1
+                    except Exception as table_error:
+                        logger.warning(f"Error extracting tables from page {page_number}: {str(table_error)}")
+                        
                     self.processing_stats["pages_processed"] += 1
+                    
                 except Exception as e:
-                    logger.warning(f"Error on page {page_number}: {str(e)}")
+                    logger.warning(f"Error processing page {page_number}: {str(e)}")
+                    # Continue with next page but add placeholder
+                    self.text_lines.append(f"--- Page {page_number} [Processing Error] ---")
                     continue
         self.processing_stats["processing_time"] = time.time() - start_time
 
