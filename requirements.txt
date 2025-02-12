@@ -9,12 +9,5 @@ pylint>=3.0.0
 python-dotenv>=1.0.0
 typing-extensions>=4.9.0
 
-# Additional dependencies that will be installed automatically
-# pathlib (built-in)
-# tempfile (built-in)
-# json (built-in)
-# logging (built-in)
-# re (built-in)
-
-# Note: After installing, run:
-# python -m spacy download en_core_web_sm
+# Install local package in editable mode
+-e .
