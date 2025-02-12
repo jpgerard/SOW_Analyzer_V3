@@ -50,10 +50,10 @@ def cleanup_temp_file(file_path: Optional[Path]):
 def main():
     """Main application entry point."""
     # Import here to avoid circular imports
-    from document_processing import AdvancedDocumentExtractor
-    from analysis import extract_toc, EnhancedSectionExtractor
-    from extraction import RequirementExtractor
-    from reporting import HybridProposalMatcher
+    from src.document_processing.advanced_extractor import AdvancedDocumentExtractor
+    from src.analysis.section_extractor import extract_toc, EnhancedSectionExtractor
+    from src.extraction.requirement_extractor import RequirementExtractor
+    from src.reporting.proposal_matcher import HybridProposalMatcher
 
     st.set_page_config(page_title="State-of-the-Art SOW Analyzer", layout="wide")
     st.title("State-of-the-Art SOW Analyzer")
